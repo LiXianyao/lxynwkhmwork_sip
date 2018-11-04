@@ -277,11 +277,11 @@ int main(int argc, char *argv[])
 
 		cfg.id = pj_str("sip:" SIP_USER "@" LOCAL_DOMAIN);
 
-		cfg.reg_uri = pj_str("sip:" SIP_DOMAIN);
+		cfg.reg_uri = pj_str("sip:" LOCAL_DOMAIN);
 
 		cfg.cred_count = 1;
 
-		cfg.cred_info[0].realm = pj_str(SIP_DOMAIN);
+		cfg.cred_info[0].realm = pj_str(LOCAL_DOMAIN);
 
 		cfg.cred_info[0].scheme = pj_str("digest");
 

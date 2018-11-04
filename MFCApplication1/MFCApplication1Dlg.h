@@ -37,11 +37,13 @@
 #define THIS_FILE	"APP"
 
 #define SIP_DOMAIN	"10.105.242.72"
-
+#define SEVER_USER  "12345"
 #define SIP_USER	"12345"
 
 #define SIP_PASSWD	""
 #define LOCAL_DOMAIN "10.210.54.173"
+#define current_acc	pjsua_acc_get_default()
+#define PJSUA_INVALID_ID -1
 
 // CMFCApplication1Dlg 对话框
 class CMFCApplication1Dlg : public CDialogEx
@@ -84,6 +86,13 @@ public:
 	afx_msg void OnBnClickedButton9();
 
 
+	//不知道是什么的定义
+	static bool no_tones;
+	static bool ring_on;
+	static int ring_cnt;
+	static int ring_slot;
+	static pjsua_call_id call_in;
+
 	//sip定义
 	pjsua_acc_id acc_id;
 	pjsua_config cfg;
@@ -91,6 +100,71 @@ public:
 	pj_status_t status;
 	pjsua_transport_config tran_cfg;
 	pjsua_acc_config acc_cfg;
+	pjsua_transport_id transport_id = -1;
 	void initSip();
 	void error_exit(const char *title, pj_status_t status);
+	static void on_incoming_call(pjsua_acc_id acc_id, pjsua_call_id call_id,
+		pjsip_rx_data *rdata)
+	{
+		pjsua_call_info call_info;
+		PJ_UNUSED_ARG(acc_id);
+		PJ_UNUSED_ARG(rdata);
+
+		pjsua_call_get_info(call_id, &call_info);
+
+		//if (current_call == PJSUA_INVALID_ID)
+		//	current_call = call_id;
+		/* Start ringback */
+		ring_start(call_id);
+
+		PJ_LOG(3, (THIS_FILE, "Incoming call for account %d!\n"
+		  "Media count: %d audio & %d video\n"
+		  "From: %s\n"
+		  "To: %s\n",
+			acc_id,
+			call_info.rem_aud_cnt,
+			call_info.rem_vid_cnt,
+			call_info.remote_info.ptr,
+			call_info.local_info.ptr));
+
+		CString msg;
+		msg.Format(_T("Incoming call for account %d!\n"
+		  "Media count: %d audio & %d video\n"
+		  "From: %s\n"
+			"To: %s\n"),
+			acc_id,
+			call_info.rem_aud_cnt,
+			call_info.rem_vid_cnt,
+			call_info.remote_info.ptr,
+			call_info.local_info.ptr);
+		AfxMessageBox(msg);
+		call_in = call_id;
+	}
+
+	static void ring_start(pjsua_call_id call_id)
+	{
+		if (no_tones)
+			return;
+
+		//if (call_data[call_id].ring_on)
+		if (ring_on)
+			return;
+
+		ring_on = PJ_TRUE;
+
+		if (++ring_cnt == 1 &&
+			ring_slot != PJSUA_INVALID_ID)
+		{
+			pjsua_conf_connect(ring_slot, 0);
+		}
+	}
+	afx_msg void OnBnClickedButtonans();
+	afx_msg void OnBnClickedButtonansip();
+	afx_msg void OnBnClickedButtonansat();
+	afx_msg void OnBnClickedButtonandel();
+	afx_msg void OnBnClickedButtonshurp();
+	afx_msg void OnBnClickedButton0();
+	afx_msg void OnBnClickedButtonstar();
+	afx_msg void OnBnClickedButtonancall();
+	afx_msg void OnBnClickedButtonansadot();
 };

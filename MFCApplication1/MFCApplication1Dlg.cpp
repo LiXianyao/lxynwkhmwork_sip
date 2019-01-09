@@ -16,6 +16,7 @@ bool CMFCApplication1Dlg::ring_on = PJ_FALSE;
 int CMFCApplication1Dlg::ring_cnt = 0;
 int CMFCApplication1Dlg::ring_slot = PJSUA_INVALID_ID;
 pjsua_call_id CMFCApplication1Dlg::call_in = PJSUA_INVALID_ID;
+pjsua_call_id CMFCApplication1Dlg::current_call = PJSUA_INVALID_ID;
 
 // 用于应用程序“关于”菜单项的 CAboutDlg 对话框
 
@@ -90,6 +91,7 @@ BEGIN_MESSAGE_MAP(CMFCApplication1Dlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BUTTONSTAR, &CMFCApplication1Dlg::OnBnClickedButtonstar)
 	ON_BN_CLICKED(IDC_BUTTONANCALL, &CMFCApplication1Dlg::OnBnClickedButtonancall)
 	ON_BN_CLICKED(IDC_BUTTONANSADOT, &CMFCApplication1Dlg::OnBnClickedButtonansadot)
+	ON_BN_CLICKED(IDC_BUTTONDTMF, &CMFCApplication1Dlg::OnBnClickedButtondtmf)
 END_MESSAGE_MAP()
 
 
@@ -142,17 +144,7 @@ void CMFCApplication1Dlg :: error_exit(const char *title, pj_status_t status)
 }
 
 
-/* Callback called by the library when call's state has changed */
-static void on_call_state(pjsua_call_id call_id, pjsip_event *e)
-{
-	pjsua_call_info ci;
-	PJ_UNUSED_ARG(e);
-	pjsua_call_get_info(call_id, &ci);
-	PJ_LOG(3, (THIS_FILE, "Call %d state=%.*s", call_id,
-		(int)ci.state_text.slen,
-		ci.state_text.ptr));
 
-}
 
 
 /* Callback called by the library when call's media state has changed */
@@ -437,12 +429,29 @@ void CMFCApplication1Dlg::OnBnClickedButtonandel()
 
 void CMFCApplication1Dlg::OnBnClickedButtonans()
 {
-	// TODO: 在此添加控件通知处理程序代码
-	if (call_in == PJSUA_INVALID_ID) {
-		MessageBox(_T("Nothing answer"));
+	// 接听/拒绝:  如果当前有通话，则挂断，否则接听
+	if (current_call == PJSUA_INVALID_ID) {
+		//检查接听
+		if (call_in == PJSUA_INVALID_ID) {
+			MessageBox(_T("Nothing answer"));
+		}
+		else {
+			pjsua_call_answer(call_in, 200, NULL, NULL);
+			current_call = call_in;
+			cancel_announce = false;
+		}
 	}
-	else
-		pjsua_call_answer(call_in, 200, NULL, NULL);
+	else { //检查拒绝
+		if (cancel_announce == false) {
+			MessageBox(_T("再点击一次挂断，完成挂断"));
+			cancel_announce = true;
+		}
+		else {
+			pjsua_msg_data msg_data_;
+			pjsua_call_hangup(current_call,0,NULL,&msg_data_);
+			current_call = PJSUA_INVALID_ID;
+		}
+	}
 	
 }
 
@@ -450,8 +459,36 @@ void CMFCApplication1Dlg::OnBnClickedButtonans()
 void CMFCApplication1Dlg::OnBnClickedButtonancall()
 {
 	// 拨号键
-	pj_str_t uri = pj_str(m_str.GetBuffer(0));
-	status = pjsua_call_make_call(acc_id, &uri, 0, NULL, NULL, NULL);
-	if (status != PJ_SUCCESS) error_exit("Error making call", status);
+	if (current_call != PJSUA_INVALID_ID) {
+		MessageBox(_T("正在通话中，请挂断后再拨"));
+	}
+	else {
+		pj_str_t uri = pj_str(m_str.GetBuffer(0));
+		pjsua_call_setting call_opt;
+		pjsua_call_setting_default(&call_opt);
+		call_opt.aud_cnt = 1;
+		call_opt.vid_cnt = 0;
+
+		status = pjsua_call_make_call(acc_id, &uri, &call_opt, NULL, NULL, NULL);
+		if (status != PJ_SUCCESS) error_exit("Error making call", status);
+	}
 }
 
+
+void CMFCApplication1Dlg::OnBnClickedButtondtmf()
+{
+	// TODO: 在此添加控件通知处理程序代码
+	if (current_call == PJSUA_INVALID_ID) {
+		MessageBox(_T("No current call"));
+	}
+	else{
+		pj_str_t dtmf_msg = pj_str(m_str.GetBuffer(0));
+		pj_status_t status = pjsua_call_dial_dtmf(current_call, &dtmf_msg);
+		if (status != PJ_SUCCESS) {
+			MessageBox(_T("Unable to send DTMF"));
+		}
+		else {
+			MessageBox(_T("DTMF 信息发送成功！"));
+		}
+	}
+}

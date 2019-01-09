@@ -87,11 +87,13 @@ public:
 
 
 	//不知道是什么的定义
+	bool cancel_announce = false;
 	static bool no_tones;
 	static bool ring_on;
 	static int ring_cnt;
 	static int ring_slot;
 	static pjsua_call_id call_in;
+	static pjsua_call_id current_call;
 
 	//sip定义
 	pjsua_acc_id acc_id;
@@ -141,6 +143,39 @@ public:
 		call_in = call_id;
 	}
 
+	/* Callback called by the library when call's state has changed */
+	static void on_call_state(pjsua_call_id call_id, pjsip_event *e)
+	{
+		pjsua_call_info call_info;
+
+		PJ_UNUSED_ARG(e);
+
+		pjsua_call_get_info(call_id, &call_info);
+
+		if (call_info.state == PJSIP_INV_STATE_DISCONNECTED) {
+
+			/* Stop all ringback for this call */
+			//ring_stop(call_id);
+
+			PJ_LOG(3, (THIS_FILE, "Call %d is DISCONNECTED [reason=%d (%s)]",
+				call_id,
+				call_info.last_status,
+				call_info.last_status_text.ptr));
+
+			if (call_id == current_call) {
+				CString msg = "对方已挂断";
+				AfxMessageBox(msg);
+			}
+		}
+		if (call_info.state == PJSIP_INV_STATE_CONFIRMED)
+		{
+			CString msg = "对方已接通";
+			current_call = call_id;
+			AfxMessageBox(msg);
+		}
+
+	}
+
 	static void ring_start(pjsua_call_id call_id)
 	{
 		if (no_tones)
@@ -167,4 +202,6 @@ public:
 	afx_msg void OnBnClickedButtonstar();
 	afx_msg void OnBnClickedButtonancall();
 	afx_msg void OnBnClickedButtonansadot();
+	afx_msg void OnBnClickedButtonans2();
+	afx_msg void OnBnClickedButtondtmf();
 };

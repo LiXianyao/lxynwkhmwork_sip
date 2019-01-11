@@ -121,10 +121,7 @@ public:
 		PJ_UNUSED_ARG(rdata);
 
 		pjsua_call_get_info(call_id, &call_info);
-
-		//if (current_call == PJSUA_INVALID_ID)
-		//	current_call = call_id;
-		/* Start ringback */
+		call_in = call_id;
 		ring_start(call_id);
 
 		CString msg;
@@ -132,7 +129,6 @@ public:
 			call_info.remote_info.ptr);
 		AfxMessageBox(msg);
 		stage_msg = msg;
-		call_in = call_id;
 	}
 
 	/* Callback called by the library when call's state has changed */
@@ -160,6 +156,10 @@ public:
 				CString msg = "已挂断";
 				AfxMessageBox(msg);
 			}
+			else if (call_in != PJSUA_INVALID_ID) {
+				call_in = PJSUA_INVALID_ID;
+				stage_msg = "主叫方已经挂断";
+			}
 		}
 		if (call_info.state == PJSIP_INV_STATE_CONFIRMED)
 		{
@@ -173,6 +173,13 @@ public:
 		{
 			CString msg = "ringback 1";
 			stage_msg = "正在呼叫.......";
+			current_call = call_id;
+			ringback_start(call_id);
+			//AfxMessageBox(msg);
+		}
+		if (call_info.state == PJSIP_INV_STATE_CONNECTING)
+		{
+			stage_msg = "未能建立连接，正在尝试重连.......";
 			current_call = call_id;
 			ringback_start(call_id);
 			//AfxMessageBox(msg);

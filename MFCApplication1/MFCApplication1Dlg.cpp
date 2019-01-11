@@ -158,7 +158,7 @@ BOOL CMFCApplication1Dlg::OnInitDialog()
 	hBitmapCollection = (HBITMAP)::LoadImage(NULL, "res/reject.bmp", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE | LR_CREATEDIBSECTION);
 	((CButton *)GetDlgItem(IDC_BUTTONREJCET))->SetBitmap(hBitmapCollection);
 
-	SetTimer(1, 2000, NULL);
+	SetTimer(1, 1000, NULL);
 	// TODO: 在此添加额外的初始化代码
 	//MessageBox(_T("open!"));
 	initSip();
@@ -187,9 +187,11 @@ void CMFCApplication1Dlg::OnTimer(UINT nIDEvent) {
 	{
 		//检查声音
 		if (current_call == PJSUA_INVALID_ID) {
-			if (ringback_on || ring_on) ring_stop(current_call);
+			if (ringback_on) ring_stop(current_call);
 		}
-
+		if (call_in == PJSUA_INVALID_ID) {
+			if (ring_on) ring_stop(current_call);
+		}
 	}
 }
 

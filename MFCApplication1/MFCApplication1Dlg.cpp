@@ -11,12 +11,32 @@
 #define new DEBUG_NEW
 #endif
 
+/* Ringtones		    US	       UK  */
+#define RINGBACK_FREQ1	    440	    /* 400 */
+#define RINGBACK_FREQ2	    480	    /* 450 */
+#define RINGBACK_ON	    2000    /* 400 */
+#define RINGBACK_OFF	    4000    /* 200 */
+#define RINGBACK_CNT	    1	    /* 2   */
+#define RINGBACK_INTERVAL   4000    /* 2000 */
+
+#define RING_FREQ1	    800
+#define RING_FREQ2	    640
+#define RING_ON		    200
+#define RING_OFF	    100
+#define RING_CNT	    3
+#define RING_INTERVAL	    3000
+
 bool CMFCApplication1Dlg::no_tones = false;
 bool CMFCApplication1Dlg::ring_on = PJ_FALSE;
 int CMFCApplication1Dlg::ring_cnt = 0;
-int CMFCApplication1Dlg::ring_slot = PJSUA_INVALID_ID;
+bool CMFCApplication1Dlg::ringback_on = PJ_FALSE;
+int CMFCApplication1Dlg::ringback_cnt = 0;
 pjsua_call_id CMFCApplication1Dlg::call_in = PJSUA_INVALID_ID;
 pjsua_call_id CMFCApplication1Dlg::current_call = PJSUA_INVALID_ID;
+pjsua_call_id CMFCApplication1Dlg::ringback_slot = PJSUA_INVALID_ID;
+pjsua_call_id CMFCApplication1Dlg::ring_slot = PJSUA_INVALID_ID;
+
+
 
 // 用于应用程序“关于”菜单项的 CAboutDlg 对话框
 
@@ -209,23 +229,6 @@ void CMFCApplication1Dlg::initSip() {
 
 	if (status != PJ_SUCCESS) error_exit("Error starting pjsua", status);
 
-	/* Register to SIP server by creating SIP account. 这种是设置sip:user@ip的，需要注册
-	{
-		pjsua_acc_config_default(&acc_cfg);
-		acc_cfg.id = pj_str("sip:" SIP_USER "@" LOCAL_DOMAIN);
-		acc_cfg.reg_uri = pj_str("sip:" LOCAL_DOMAIN);
-		acc_cfg.cred_count = 1;
-		acc_cfg.cred_info[0].realm = pj_str(LOCAL_DOMAIN);
-		acc_cfg.cred_info[0].scheme = pj_str("digest");
-		acc_cfg.cred_info[0].username = pj_str(SIP_USER);
-		acc_cfg.cred_info[0].data_type = PJSIP_CRED_DATA_PLAIN_PASSWD;
-		acc_cfg.cred_info[0].data = pj_str(SIP_PASSWD);
-		//Add a local account. A local account is used to identify local endpoint
-		//  instead of a specific user, and for this reason, a transport ID is needed to obtain the local address information.
-		status = pjsua_acc_add(&acc_cfg, PJ_TRUE, &acc_id);  //acc_id 是调用后被分配的
-		if (status != PJ_SUCCESS) error_exit("Error adding account", status);
-	}*/
-
 	/* Add UDP transport unless it's disabled. 这种是直接产生 sip:localhost的，不用注册的样子*/
 	{
 		pjsip_transport_type_e type = PJSIP_TRANSPORT_UDP;
@@ -245,13 +248,70 @@ void CMFCApplication1Dlg::initSip() {
 		pjsua_acc_set_online_status(current_acc, PJ_TRUE);
 	}
 
-	/* make call to the URL. */
+	/* Create ringback tones */
 	{
-		
+		unsigned samples_per_frame;
+		pjmedia_tone_desc tone[RING_CNT + RINGBACK_CNT];
+		pj_str_t name;
+
+		samples_per_frame = 2 *
+			8000 *
+			1 / 1000;
+
+		/* Ringback tone (call is ringing) */
+		name = pj_str("ringback");
+		status = pjmedia_tonegen_create2(tmp_pool, &name,
+			8000, 1, 160,
+			16, PJMEDIA_TONEGEN_LOOP,
+			&this->ringback_port);
+		if (status != PJ_SUCCESS)
+			error_exit("Create tone failed", status);
+
+		pj_bzero(&tone, sizeof(tone));
+		for (int i = 0; i<RINGBACK_CNT; ++i) {
+			tone[i].freq1 = RINGBACK_FREQ1;
+			tone[i].freq2 = RINGBACK_FREQ2;
+			tone[i].on_msec = RINGBACK_ON;
+			tone[i].off_msec = RINGBACK_OFF;
+		}
+		tone[RINGBACK_CNT - 1].off_msec = RINGBACK_INTERVAL;
+
+		pjmedia_tonegen_play(this->ringback_port, RINGBACK_CNT, tone,
+			PJMEDIA_TONEGEN_LOOP);
+
+
+		status = pjsua_conf_add_port(tmp_pool, this->ringback_port,
+			&this->ringback_slot);
+		if (status != PJ_SUCCESS)
+			error_exit("add port failed", status);
+
+		/* Ring (to alert incoming call) */
+		name = pj_str("ring");
+		status = pjmedia_tonegen_create2(tmp_pool, &name,
+			4000,1,80,
+			16, PJMEDIA_TONEGEN_LOOP,
+			&this->ring_port);
+		if (status != PJ_SUCCESS)
+			error_exit("Create tone failed2", status);
+
+		for (int i = 0; i<RING_CNT; ++i) {
+			tone[i].freq1 = RING_FREQ1;
+			tone[i].freq2 = RING_FREQ2;
+			tone[i].on_msec = RING_ON;
+			tone[i].off_msec = RING_OFF;
+		}
+		tone[RING_CNT - 1].off_msec = RING_INTERVAL;
+
+		pjmedia_tonegen_play(this->ring_port, RING_CNT,
+			tone, PJMEDIA_TONEGEN_LOOP);
+
+		status = pjsua_conf_add_port(tmp_pool, this->ring_port,
+			&this->ring_slot);
+		if (status != PJ_SUCCESS)
+			error_exit("add port failed2", status);
+
 	}
-}pj_str_t uri = pj_str("sip:12345@10.105.242.72");
-		//status = pjsua_call_make_call(acc_id, &uri, 0, NULL, NULL, NULL);
-		//if (status != PJ_SUCCESS) error_exit("Error making call", status);
+}
 
 void CMFCApplication1Dlg::OnSysCommand(UINT nID, LPARAM lParam)
 {

@@ -91,7 +91,8 @@ public:
 	static bool no_tones;
 	static bool ring_on;
 	static int ring_cnt;
-	static int ring_slot;
+	static bool ringback_on;
+	static int ringback_cnt;
 	static pjsua_call_id call_in;
 	static pjsua_call_id current_call;
 
@@ -103,6 +104,10 @@ public:
 	pjsua_transport_config tran_cfg;
 	pjsua_acc_config acc_cfg;
 	pjsua_transport_id transport_id = -1;
+	pjmedia_port *ringback_port;
+	static pjsua_conf_port_id ringback_slot;
+	pjmedia_port *ring_port;
+	static pjsua_conf_port_id ring_slot;
 	void initSip();
 	void error_exit(const char *title, pj_status_t status);
 	static void on_incoming_call(pjsua_acc_id acc_id, pjsua_call_id call_id,
@@ -155,7 +160,7 @@ public:
 		if (call_info.state == PJSIP_INV_STATE_DISCONNECTED) {
 
 			/* Stop all ringback for this call */
-			//ring_stop(call_id);
+			ring_stop(call_id);
 
 			PJ_LOG(3, (THIS_FILE, "Call %d is DISCONNECTED [reason=%d (%s)]",
 				call_id,
@@ -171,9 +176,64 @@ public:
 		{
 			CString msg = "对方已接通";
 			current_call = call_id;
+			ring_stop(call_id);
 			AfxMessageBox(msg);
 		}
+		if (call_info.state == PJSIP_INV_STATE_EARLY)
+		{
+			ringback_start(call_id);
+		}
 
+	}
+
+	/*****************************************************************************
+	* Callback
+	*/
+	static void ringback_start(pjsua_call_id call_id)
+	{
+		if (no_tones)
+			return;
+
+		if (ringback_on)
+			return;
+
+		ringback_on = PJ_TRUE;
+
+		if (++ringback_cnt == 1 &&
+			ringback_slot != PJSUA_INVALID_ID)
+		{
+			pjsua_conf_connect(ringback_slot, 0);
+		}
+	}
+
+	static void ring_stop(pjsua_call_id call_id)
+	{
+		if (no_tones)
+			return;
+
+		if (ringback_on) {
+			ringback_on = PJ_FALSE;
+
+			pj_assert(app_config.ringback_cnt>0);
+			if (--ringback_cnt == 0 &&
+				ringback_slot != PJSUA_INVALID_ID)
+			{
+				pjsua_conf_disconnect(ringback_slot, 0);
+				//pjmedia_tonegen_rewind(ringback_port);
+			}
+		}
+
+		if (ring_on) {
+			ring_on = PJ_FALSE;
+
+			pj_assert(app_config.ring_cnt>0);
+			if (--ring_cnt == 0 &&
+				ring_slot != PJSUA_INVALID_ID)
+			{
+				pjsua_conf_disconnect(ring_slot, 0);
+				//pjmedia_tonegen_rewind(ring_port);
+			}
+		}
 	}
 
 	static void ring_start(pjsua_call_id call_id)
@@ -181,7 +241,6 @@ public:
 		if (no_tones)
 			return;
 
-		//if (call_data[call_id].ring_on)
 		if (ring_on)
 			return;
 

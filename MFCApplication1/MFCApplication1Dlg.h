@@ -51,6 +51,7 @@ class CMFCApplication1Dlg : public CDialogEx
 // 构造
 public:
 	CMFCApplication1Dlg(CWnd* pParent = NULL);	// 标准构造函数
+	void CMFCApplication1Dlg::OnTimer(UINT nIDEvent);
 
 // 对话框数据
 #ifdef AFX_DESIGN_TIME
@@ -108,6 +109,8 @@ public:
 	static pjsua_conf_port_id ringback_slot;
 	pjmedia_port *ring_port;
 	static pjsua_conf_port_id ring_slot;
+	static CString stage_msg;
+	static CString static_msg;
 	void initSip();
 	void error_exit(const char *title, pj_status_t status);
 	static void on_incoming_call(pjsua_acc_id acc_id, pjsua_call_id call_id,
@@ -124,27 +127,11 @@ public:
 		/* Start ringback */
 		ring_start(call_id);
 
-		PJ_LOG(3, (THIS_FILE, "Incoming call for account %d!\n"
-		  "Media count: %d audio & %d video\n"
-		  "From: %s\n"
-		  "To: %s\n",
-			acc_id,
-			call_info.rem_aud_cnt,
-			call_info.rem_vid_cnt,
-			call_info.remote_info.ptr,
-			call_info.local_info.ptr));
-
 		CString msg;
-		msg.Format(_T("Incoming call for account %d!\n"
-		  "Media count: %d audio & %d video\n"
-		  "From: %s\n"
-			"To: %s\n"),
-			acc_id,
-			call_info.rem_aud_cnt,
-			call_info.rem_vid_cnt,
-			call_info.remote_info.ptr,
-			call_info.local_info.ptr);
+		msg.Format(_T("收到来自%s的呼叫!\n"),
+			call_info.remote_info.ptr);
 		AfxMessageBox(msg);
+		stage_msg = msg;
 		call_in = call_id;
 	}
 
@@ -168,20 +155,27 @@ public:
 				call_info.last_status_text.ptr));
 
 			if (call_id == current_call) {
-				CString msg = "对方已挂断";
+				current_call = PJSUA_INVALID_ID;
+				stage_msg = "通话已结束，可以重新拨打";
+				CString msg = "已挂断";
 				AfxMessageBox(msg);
 			}
 		}
 		if (call_info.state == PJSIP_INV_STATE_CONFIRMED)
 		{
 			CString msg = "对方已接通";
+			stage_msg = "正在通话中，修改编辑栏的内容后可以点击发送dtmf消息（仅支持数字）";
 			current_call = call_id;
 			ring_stop(call_id);
-			AfxMessageBox(msg);
+			//xMessageBox(msg);
 		}
-		if (call_info.state == PJSIP_INV_STATE_EARLY)
+		if (call_info.state == PJSIP_INV_STATE_CALLING)
 		{
+			CString msg = "ringback 1";
+			stage_msg = "正在呼叫.......";
+			current_call = call_id;
 			ringback_start(call_id);
+			//AfxMessageBox(msg);
 		}
 
 	}
@@ -214,7 +208,7 @@ public:
 		if (ringback_on) {
 			ringback_on = PJ_FALSE;
 
-			pj_assert(app_config.ringback_cnt>0);
+			pj_assert(ringback_cnt>0);
 			if (--ringback_cnt == 0 &&
 				ringback_slot != PJSUA_INVALID_ID)
 			{
@@ -226,7 +220,7 @@ public:
 		if (ring_on) {
 			ring_on = PJ_FALSE;
 
-			pj_assert(app_config.ring_cnt>0);
+			pj_assert(ring_cnt>0);
 			if (--ring_cnt == 0 &&
 				ring_slot != PJSUA_INVALID_ID)
 			{
@@ -252,6 +246,7 @@ public:
 			pjsua_conf_connect(ring_slot, 0);
 		}
 	}
+	void checkinput();
 	afx_msg void OnBnClickedButtonans();
 	afx_msg void OnBnClickedButtonansip();
 	afx_msg void OnBnClickedButtonansat();
@@ -263,4 +258,5 @@ public:
 	afx_msg void OnBnClickedButtonansadot();
 	afx_msg void OnBnClickedButtonans2();
 	afx_msg void OnBnClickedButtondtmf();
+	afx_msg void OnBnClickedButtonrejcet();
 };

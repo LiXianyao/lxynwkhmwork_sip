@@ -135,26 +135,17 @@ public:
 	static void on_call_state(pjsua_call_id call_id, pjsip_event *e)
 	{
 		pjsua_call_info call_info;
-
 		PJ_UNUSED_ARG(e);
-
 		pjsua_call_get_info(call_id, &call_info);
 
 		if (call_info.state == PJSIP_INV_STATE_DISCONNECTED) {
-
 			/* Stop all ringback for this call */
 			ring_stop(call_id);
-
-			PJ_LOG(3, (THIS_FILE, "Call %d is DISCONNECTED [reason=%d (%s)]",
-				call_id,
-				call_info.last_status,
-				call_info.last_status_text.ptr));
-
 			if (call_id == current_call) {
 				current_call = PJSUA_INVALID_ID;
-				stage_msg = "通话已结束，可以重新拨打";
+				stage_msg = "通话已结束，可以重新拨打";	//文字提示更新
 				CString msg = "已挂断";
-				AfxMessageBox(msg);
+				AfxMessageBox(msg);		//弹窗提示
 			}
 			else if (call_in != PJSUA_INVALID_ID) {
 				call_in = PJSUA_INVALID_ID;

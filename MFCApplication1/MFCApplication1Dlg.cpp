@@ -217,34 +217,20 @@ static void call_on_dtmf_callback(pjsua_call_id call_id, int dtmf) {
 	AfxMessageBox(msg);
 }
 
-/*
-* Handler registration status has changed.
-*/
-static void on_reg_state(pjsua_acc_id acc_id)
-{
-	PJ_UNUSED_ARG(acc_id);
-
-	// Log already written.
-}
-
 void CMFCApplication1Dlg::initSip() {
+	/*创建pjsua实例*/
 	status = pjsua_create();
 	pj_pool_t *tmp_pool;
 	tmp_pool = pjsua_pool_create("tmp-pjsua", 1000, 1000);
 
 	if (status != PJ_SUCCESS) error_exit("Error in pjsua_create()", status);
 
-	/* If argument is specified, it's got to be a valid SIP URL */
-	status = pjsua_verify_url("sip:" SEVER_USER "@" SIP_DOMAIN);
-	if (status != PJ_SUCCESS) error_exit("Invalid URL in argv", status);
-
-	/* Init pjsua */
+	/* 初始化pjsua，设置回调函数*/
 	{
 		pjsua_config_default(&cfg);
 		cfg.cb.on_incoming_call = &on_incoming_call;
 		cfg.cb.on_call_media_state = &on_call_media_state;
 		cfg.cb.on_call_state = &on_call_state;
-		cfg.cb.on_reg_state = &on_reg_state;
 		cfg.cb.on_dtmf_digit = &call_on_dtmf_callback;
 
 		pjsua_logging_config_default(&log_cfg);
@@ -262,9 +248,7 @@ void CMFCApplication1Dlg::initSip() {
 	}
 
 	/* Initialization is done, now start pjsua */
-
 	status = pjsua_start();
-
 	if (status != PJ_SUCCESS) error_exit("Error starting pjsua", status);
 
 	/* Add UDP transport unless it's disabled. 这种是直接产生 sip:localhost的，不用注册的样子*/
@@ -276,13 +260,8 @@ void CMFCApplication1Dlg::initSip() {
 		{
 			pjsua_acc_config acc_cfg;
 			pjsua_acc_get_config(acc_id, tmp_pool, &acc_cfg);
-
-			//app_config_init_video(&acc_cfg);
-			//acc_cfg.rtp_cfg = app_config.rtp_cfg;
 			pjsua_acc_modify(acc_id, &acc_cfg);
 		}
-
-		//pjsua_acc_set_transport(aid, transport_id);
 		pjsua_acc_set_online_status(current_acc, PJ_TRUE);
 	}
 
@@ -292,14 +271,10 @@ void CMFCApplication1Dlg::initSip() {
 		pjmedia_tone_desc tone[RING_CNT + RINGBACK_CNT];
 		pj_str_t name;
 
-		samples_per_frame = 2 *
-			8000 *
-			1 / 1000;
-
 		/* Ringback tone (call is ringing) */
 		name = pj_str("ringback");
 		status = pjmedia_tonegen_create2(tmp_pool, &name,
-			8000, 2, 320,
+			8000, 2, 320,  //设置回铃音的采样率、通道数、帧数
 			16, PJMEDIA_TONEGEN_LOOP,
 			&this->ringback_port);
 		if (status != PJ_SUCCESS)
@@ -313,11 +288,10 @@ void CMFCApplication1Dlg::initSip() {
 			tone[i].off_msec = RINGBACK_OFF;
 		}
 		tone[RINGBACK_CNT - 1].off_msec = RINGBACK_INTERVAL;
-
+		
+		//铃声设置绑定到媒体端口
 		pjmedia_tonegen_play(this->ringback_port, RINGBACK_CNT, tone,
 			PJMEDIA_TONEGEN_LOOP);
-
-
 		status = pjsua_conf_add_port(tmp_pool, this->ringback_port,
 			&this->ringback_slot);
 		if (status != PJ_SUCCESS)
@@ -554,6 +528,9 @@ void CMFCApplication1Dlg::OnBnClickedButtonancall()
 	// 拨号键
 	if (current_call != PJSUA_INVALID_ID) {
 		MessageBox(_T("正在通话中，请挂断后再拨"));
+	}
+	else if (call_in != PJSUA_INVALID_ID) {
+		MessageBox(_T("有未处理的未接电话，请挂断后再拨"));
 	}
 	else {
 		checkinput();//校正输入框
